@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Камень, Ножницы, Бумага — Поединок</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Comfortaa:wght@500;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #0f1c15;
+      --bg-gradient: radial-gradient(circle at 20% 20%, #1e3a29 0%, #0d1812 60%, #070d0a 100%);
+      --board-bg: #1c3327;
+      --cell-light: #d6e4da;
+      --cell-dark: #bdcfc2;
+      --border-color: #406b4e;
+      --panel-bg: rgba(15, 27, 20, 0.85);
+      --accent-color: #4ade80;
+      --text-main: #f0f7f2;
+      --header-color: #86efac;
+    }
+
+    body.theme-summer {
+      --bg-dark: #1e3a4b;
+      --bg-gradient: radial-gradient(circle at 30% 20%, #38bdf8 0%, #0284c7 50%, #0c4a6e 100%);
+      --board-bg: #e0f2fe;
+      --cell-light: #fef08a;
+      --cell-dark: #fde047;
+      --border-color: #0284c7;
+      --panel-bg: rgba(12, 74, 110, 0.85);
+      --accent-color: #facc15;
+      --text-main: #f0f9ff;
+      --header-color: #fef08a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Comfortaa', cursive, sans-serif;
+      background: var(--bg-dark);
+      background-image: var(--bg-gradient);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      position: relative;
+      overflow-x: hidden;
+      transition: background 0.4s ease;
+    }
+
+    .app-card {
+      position: relative;
+      z-index: 1;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-width: 960px;
+      width: 100%;
+    }
+
+    header {
+      text-align: center;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
+      padding-bottom: 8px;
+    }
+
+    h1 {
+      font-family: 'Caveat', cursive;
+      font-size: clamp(26px, 6vw, 38px);
+      color: var(--header-color);
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      line-height: 1;
+    }
+
+    .subtitle {
+      font-size: clamp(10px, 2.5vw, 12px);
+      opacity: 0.85;
+      margin-top: 4px;
+    }
+
+    .game-layout {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .board-wrapper {
+      position: relative;
+      background: var(--board-bg);
+      padding: 8px;
+      border-radius: 16px;
+      border: 2px solid var(--border-color);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      max-width: min(92vw, 55vh, 460px);
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      grid-template-rows: repeat(9, 1fr);
+      gap: 2px;
+      width: 100%;
+      height: 100%;
+      aspect-ratio: 1 / 1;
+      background: var(--border-color);
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    .cell {
+      background-color: var(--cell-light);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      position: relative;
+      aspect-ratio: 1 / 1;
+      width: 100%;
+      height: 100%;
+      transition: background 0.15s;
+    }
+
+    .cell.alt {
+      background-color: var(--cell-dark);
+    }
+
+    .cell.blocked {
+      background-color: rgba(0,0,0,0.4) !important;
+      cursor: not-allowed;
+    }
+
+    .cell.blocked::after {
+      content: '✕';
+      color: rgba(255,255,255,0.2);
+      font-size: clamp(12px, 3.5vw, 18px);
+    }
+
+    .cell.red-corner {
+      background-color: rgba(220, 38, 38, 0.35) !important;
+    }
+
+    .cell.blue-corner {
+      background-color: rgba(37, 99, 235, 0.35) !important;
+    }
+
+    .cell.selected {
+      background-color: #fef08a !important;
+    }
+
+    .cell.valid-move::before {
+      content: '';
+      width: clamp(8px, 2vw, 12px);
+      height: clamp(8px, 2vw, 12px);
+      background-color: #22c55e;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #22c55e;
+    }
+
+    .cell.valid-attack {
+      background-color: #fca5a5 !important;
+    }
+
+    .piece {
+      width: 88%;
+      height: 88%;
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: clamp(14px, 3.5vw, 22px);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .piece.blue {
+      background-color: #ffffff;
+      border: 2px solid #3b82f6;
+    }
+
+    .piece.red {
+      background-color: #ffffff;
+      border: 2px solid #ef4444;
+    }
+
+    .piece img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      pointer-events: none;
+      display: block;
+    }
+
+    .piece img.piece-rock {
+      object-fit: cover;
+      transform: scale(1.22);
+    }
+
+    .piece img.piece-scissors {
+      object-fit: contain;
+      transform: scale(1.05);
+    }
+
+    .piece img.piece-paper {
+      object-fit: cover;
+      transform: scale(1.12);
+    }
+
+    .sidebar {
+      width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .panel {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 12px;
+    }
+
+    .panel-title {
+      font-family: 'Caveat', cursive;
+      font-size: 20px;
+      color: var(--header-color);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .my-team-badge {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 6px 8px;
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .my-team-badge.blue {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+    }
+
+    .my-team-badge.red {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+    }
+
+    .score-board {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 8px 4px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .score-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .score-label {
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    .score-val {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      color: var(--accent-color);
+    }
+
+    .timers {
+      display: flex;
+      gap: 6px;
+    }
+
+    .timer-card {
+      flex: 1;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      padding: 6px 4px;
+      text-align: center;
+      border: 1px solid transparent;
+    }
+
+    .timer-card.active {
+      border-color: var(--accent-color);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .timer-card.blue { color: #93c5fd; }
+    .timer-card.red { color: #fca5a5; }
+
+    .timer-val {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      margin-top: 4px;
+    }
+
+    .turn-status {
+      text-align: center;
+      padding: 6px;
+      border-radius: 6px;
+      font-weight: bold;
+      background: rgba(0,0,0,0.3);
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: bold;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      flex: 1;
+      min-height: 36px;
+      touch-action: manipulation;
+    }
+
+    .btn:active {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-primary {
+      background: rgba(74, 222, 128, 0.2);
+      border-color: var(--accent-color);
+      color: var(--header-color);
+    }
+
+    .btn-danger {
+      background: rgba(185, 28, 28, 0.25);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      padding: 6px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 11px;
+      outline: none;
+      min-height: 36px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      gap: 6px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: var(--panel-bg);
+      border: 2px solid var(--border-color);
+      border-radius: 16px;
+      padding: 16px;
+      max-width: 300px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .modal h3 {
+      font-family: 'Caveat', cursive;
+      font-size: 26px;
+      color: var(--header-color);
+      margin-bottom: 6px;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 6px;
+      }
+
+      .app-card {
+        padding: 10px;
+        border-radius: 16px;
+        gap: 10px;
+      }
+
+      .game-layout {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .sidebar {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-card">
+    <header>
+      <h1>📜 Камень • Ножницы • Бумага</h1>
+      <div class="subtitle">Тактический онлайн поединок (9x9)</div>
+    </header>
+
+    <div class="game-layout">
+      <!-- Игровое Поле -->
+      <div class="board-wrapper">
+        <div id="board" class="board"></div>
+      </div>
+
+      <!-- Панель управления -->
+      <div class="sidebar">
+        
+        <div class="panel">
+          <div id="myTeamBadge" class="my-team-badge blue">
+            Вы играете за: <span>СИНИХ 🔵</span>
+          </div>
+
+          <!-- Окно подсчета очков (Вы vs Соперник) -->
+          <div class="score-board">
+            <div class="score-item">
+              <span class="score-label">Вы</span>
+              <span id="scoreMy" class="score-val">0</span>
+            </div>
+            <span style="font-size: 14px; opacity: 0.5;">:</span>
+            <div class="score-item">
+              <span class="score-label">Соперник</span>
+              <span id="scoreOpponent" class="score-val">0</span>
+            </div>
+          </div>
+
+          <div id="turnStatus" class="turn-status">
+            Ожидание старта
+          </div>
+
+          <div class="timers">
+            <div id="timerBlueCard" class="timer-card blue active">
+              <div>Синие</div>
+              <div id="timerBlue" class="timer-val">03:00</div>
+            </div>
+            <div id="timerRedCard" class="timer-card red">
+              <div>Красные</div>
+              <div id="timerRed" class="timer-val">03:00</div>
+            </div>
+          </div>
+
+          <button id="btnStartGame" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
+            🚀 Начать игру
+          </button>
+
+          <div class="btn-group">
+            <button id="btnSwapTeam" class="btn">🔄 Команды</button>
+            <button id="btnOfferDraw" class="btn">🤝 Ничья</button>
+            <button id="btnSurrender" class="btn btn-danger">🏳 Сдаться</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Оформление и Скины</div>
+          <div class="setting-row">
+            <span>Режим времени:</span>
+            <select id="selectTimeMode">
+              <option value="timed" selected>⏱ На время (3 мин + 5с)</option>
+              <option value="infinite">♾️ Без времени</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <span>Тема:</span>
+            <select id="selectTheme">
+              <option value="forest">🌲 Лесная (Стандарт)</option>
+              <option value="summer" selected>☀️ Летняя</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <span>Скины:</span>
+            <select id="selectSkins">
+              <option value="standard">🎨 Стандарт</option>
+              <option value="summer" selected>🏖️ Лето (Арт)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">
+            <span>Онлайн Игра</span>
+            <span id="netStatus" style="font-size: 10px;">● Локально</span>
+          </div>
+
+          <button id="btnHost" class="btn" style="width: 100%;">Создать комнату</button>
+          
+          <div id="hostCodeRow" class="input-row" style="display: none;">
+            <input type="text" id="myCodeInput" readonly placeholder="Код...">
+            <button id="btnCopyCode" class="btn" style="flex:0; padding: 0 10px;">📋</button>
+          </div>
+
+          <div class="input-row" style="margin-top: 6px;">
+            <input type="text" id="joinCodeInput" placeholder="Код соперника...">
+            <button id="btnJoin" class="btn">Войти</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальные окна -->
+  <div id="surrenderModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Сдаться?</h3>
+      <p style="margin-bottom:12px; font-size: 12px;">Признать поражение?</p>
+      <div class="btn-group">
+        <button id="btnConfirmSurrender" class="btn btn-danger">Да</button>
+        <button id="btnCancelSurrender" class="btn">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="drawRequestModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Предложение ничьей</h3>
+      <p style="margin-bottom:12px; font-size: 12px;">Соперник предлагает завершить партию вничью.</p>
+      <div class="btn-group">
+        <button id="btnAcceptDraw" class="btn btn-primary">Согласиться</button>
+        <button id="btnDeclineDraw" class="btn btn-danger">Отклонить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="gameOverModal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="gameOverTitle">ПОБЕДА!</h3>
+      <p id="gameOverMsg" style="margin-bottom:12px; font-size: 12px;">Синие победили!</p>
+      <button id="btnRestart" class="btn" style="width: 100%;">Играть снова</button>
+    </div>
+  </div>
+
+  <script>
+    const SUMMER_TEXTURES = {
+      rock: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500"><rect width="100%" height="100%" fill="%23ffffff"/><path d="M70,220 L150,100 L320,80 L440,180 L430,350 L280,440 L110,400 Z" fill="%2394a3b8" stroke="%2364748b" stroke-width="12" stroke-linejoin="round"/><circle cx="250" cy="250" r="50" fill="%23f59e0b"/><path d="M250,180 L250,160 M250,320 L250,340 M180,250 L160,250 M320,250 L340,250 M200,200 L185,185 M300,300 L315,315 M200,300 L185,315 M300,200 L315,185" stroke="%23d97706" stroke-width="10" stroke-linecap="round"/><circle cx="230" cy="240" r="6" fill="%2378350f"/><circle cx="270" cy="240" r="6" fill="%2378350f"/><path d="M235,265 Q250,278 265,265" stroke="%2378350f" stroke-width="5" fill="none" stroke-linecap="round"/></svg>`,
+      paper: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500"><rect width="100%" height="100%" fill="%23ffffff"/><path d="M120,70 L380,70 L380,380 L320,430 L120,430 Z" fill="%23fbe2b5" stroke="%23d97706" stroke-width="8"/><path d="M380,380 L320,380 L320,430 Z" fill="%23f59e0b" stroke="%23b45309" stroke-width="6"/><circle cx="250" cy="230" r="50" fill="none" stroke="%2378350f" stroke-width="8"/><circle cx="230" cy="220" r="5" fill="%2378350f"/><circle cx="270" cy="220" r="5" fill="%2378350f"/><path d="M235,245 Q250,258 265,245" stroke="%2378350f" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M250,165 L250,150 M250,295 L250,310 M185,230 L170,230 M315,230 L330,230 M204,184 L193,173 M296,276 L307,287 M204,276 L193,287 M296,184 L307,173" stroke="%2378350f" stroke-width="7" stroke-linecap="round"/></svg>`,
+      scissors: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500"><rect width="100%" height="100%" fill="%23ffffff"/><path d="M130,130 L380,330 M130,330 L380,130" stroke="%2306b6d4" stroke-width="36" stroke-linecap="round"/><path d="M130,130 L380,330 M130,330 L380,130" stroke="%2367e8f9" stroke-width="18" stroke-linecap="round"/><circle cx="140" cy="140" r="55" fill="none" stroke="%2316a34a" stroke-width="20"/><circle cx="140" cy="140" r="55" fill="none" stroke="%23facc15" stroke-width="16" stroke-dasharray="18,12"/><circle cx="140" cy="360" r="55" fill="none" stroke="%23f97316" stroke-width="20"/><circle cx="250" cy="230" r="28" fill="%23f59e0b"/><circle cx="250" cy="230" r="10" fill="%2378350f"/></svg>`
+    };
+
+    const SKINS = {
+      standard: { rock: '🪨', paper: '📄', scissors: '✂️' },
+      summer: { rock: SUMMER_TEXTURES.rock, paper: SUMMER_TEXTURES.paper, scissors: SUMMER_TEXTURES.scissors }
+    };
+
+    let activeSkinSet = 'summer';
+
+    const INITIAL_PIECES = [
+      { r: 1, c: 4, type: 'paper', team: 'red' },
+      { r: 1, c: 5, type: 'rock', team: 'red' },
+      { r: 2, c: 4, type: 'scissors', team: 'red' },
+      { r: 2, c: 5, type: 'paper', team: 'red' },
+      { r: 2, c: 6, type: 'rock', team: 'red' },
+      { r: 3, c: 5, type: 'scissors', team: 'red' },
+      { r: 3, c: 6, type: 'paper', team: 'red' },
+      { r: 3, c: 7, type: 'rock', team: 'red' },
+      { r: 4, c: 6, type: 'scissors', team: 'red' },
+      { r: 4, c: 7, type: 'paper', team: 'red' },
+
+      { r: 4, c: 1, type: 'paper', team: 'blue' },
+      { r: 4, c: 2, type: 'scissors', team: 'blue' },
+      { r: 5, c: 1, type: 'rock', team: 'blue' },
+      { r: 5, c: 2, type: 'paper', team: 'blue' },
+      { r: 5, c: 3, type: 'scissors', team: 'blue' },
+      { r: 6, c: 2, type: 'rock', team: 'blue' },
+      { r: 6, c: 3, type: 'paper', team: 'blue' },
+      { r: 6, c: 4, type: 'scissors', team: 'blue' },
+      { r: 7, c: 3, type: 'rock', team: 'blue' },
+      { r: 7, c: 4, type: 'paper', team: 'blue' }
+    ];
+
+    const BLOCKED_CELLS = [{ r: 0, c: 0 }, { r: 8, c: 8 }];
+    const RED_BASE = { r: 0, c: 8 };
+    const BLUE_BASE = { r: 8, c: 0 };
+
+    let boardState = Array(9).fill(null).map(() => Array(9).fill(null));
+    let currentTurn = 'blue';
+    let selectedCell = null;
+    let validMoves = [];
+    let myTeam = 'blue';
+    let isOnline = false;
+    let gameStarted = false;
+    let timeMode = 'timed';
+    let peer = null, conn = null;
+
+    let timers = { blue: 180, red: 180 };
+    let timerInterval = null;
+
+    // Очки игроков (привязаны к человеку: Вы vs Соперник)
+    let scoreMy = 0;
+    let scoreOpponent = 0;
+
+    function initGame() {
+      boardState = Array(9).fill(null).map(() => Array(9).fill(null));
+      INITIAL_PIECES.forEach(p => {
+        boardState[p.r][p.c] = { type: p.type, team: p.team };
+      });
+      currentTurn = 'blue';
+      selectedCell = null;
+      validMoves = [];
+      timers = { blue: 180, red: 180 };
+      gameStarted = false;
+
+      clearInterval(timerInterval);
+      renderBoard();
+      updateUI();
+      document.getElementById('btnStartGame').style.display = 'block';
+      document.getElementById('selectTimeMode').disabled = false;
+    }
+
+    function renderBoard() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          if ((r + c) % 2 === 1) cell.classList.add('alt');
+
+          if (r === RED_BASE.r && c === RED_BASE.c) cell.classList.add('red-corner');
+          if (r === BLUE_BASE.r && c === BLUE_BASE.c) cell.classList.add('blue-corner');
+
+          if (BLOCKED_CELLS.some(b => b.r === r && b.c === c)) {
+            cell.classList.add('blocked');
+          } else {
+            const handleAction = (e) => {
+              e.preventDefault();
+              handleCellClick(r, c);
+            };
+            cell.addEventListener('pointerdown', handleAction);
+            cell.addEventListener('click', handleAction);
+          }
+
+          if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
+            cell.classList.add('selected');
+          }
+
+          const move = validMoves.find(m => m.r === r && m.c === c);
+          if (move) {
+            cell.classList.add(move.type === 'attack' ? 'valid-attack' : 'valid-move');
+          }
+
+          const piece = boardState[r][c];
+          if (piece) {
+            const pieceEl = document.createElement('div');
+            pieceEl.className = `piece ${piece.team}`;
+            
+            const skinVal = SKINS[activeSkinSet][piece.type];
+            if (activeSkinSet === 'summer') {
+              const img = document.createElement('img');
+              img.src = skinVal;
+              img.alt = piece.type;
+              img.className = `piece-${piece.type}`;
+              pieceEl.appendChild(img);
+            } else {
+              pieceEl.textContent = skinVal;
+            }
+
+            cell.appendChild(pieceEl);
+          }
+
+          boardEl.appendChild(cell);
+        }
+      }
+    }
+
+    function handleCellClick(r, c) {
+      if (!gameStarted) return;
+      if (isOnline && currentTurn !== myTeam) return;
+
+      const piece = boardState[r][c];
+
+      if (piece && piece.team === currentTurn) {
+        selectedCell = { r, c };
+        calculateMoves(r, c);
+        renderBoard();
+        return;
+      }
+
+      if (selectedCell) {
+        const move = validMoves.find(m => m.r === r && m.c === c);
+        if (move) {
+          const from = { ...selectedCell };
+          const to = { r, c };
+
+          if (isOnline && conn && conn.open) {
+            conn.send({ type: 'MOVE', from, to });
+          }
+
+          makeMove(from, to);
+          return;
+        }
+      }
+
+      selectedCell = null;
+      validMoves = [];
+      renderBoard();
+    }
+
+    function calculateMoves(r, c) {
+      validMoves = [];
+      const piece = boardState[r][c];
+      if (!piece) return;
+
+      const dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+      dirs.forEach(([dr, dc]) => {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < 9 && nc >= 0 && nc < 9) {
+          if (BLOCKED_CELLS.some(b => b.r === nr && b.c === nc)) return;
+          const target = boardState[nr][nc];
+          if (!target) {
+            validMoves.push({ r: nr, c: nc, type: 'move' });
+          } else if (target.team !== piece.team) {
+            if (canWin(piece.type, target.type)) {
+              validMoves.push({ r: nr, c: nc, type: 'attack' });
+            }
+          }
+        }
+      });
+    }
+
+    function canWin(a, b) {
+      return (a === 'scissors' && b === 'paper') ||
+             (a === 'paper' && b === 'rock') ||
+             (a === 'rock' && b === 'scissors');
+    }
+
+    function makeMove(from, to) {
+      const piece = boardState[from.r][from.c];
+      if (!piece) return;
+
+      boardState[to.r][to.c] = piece;
+      boardState[from.r][from.c] = null;
+
+      if (timeMode === 'timed') {
+        timers[currentTurn] += 5;
+      }
+      selectedCell = null;
+      validMoves = [];
+
+      renderBoard();
+
+      if (checkWin(to, piece.team)) return;
+
+      currentTurn = currentTurn === 'blue' ? 'red' : 'blue';
+      updateUI();
+    }
+
+    function checkWin(pos, team) {
+      const enemyBase = team === 'blue' ? RED_BASE : BLUE_BASE;
+      if (pos.r === enemyBase.r && pos.c === enemyBase.c) {
+        endGame(team, `Команда ${team === 'blue' ? 'Синих' : 'Красных'} заняла угол противника!`);
+        return true;
+      }
+
+      const enemyTeam = team === 'blue' ? 'red' : 'blue';
+      let hasEnemy = false;
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (boardState[r][c] && boardState[r][c].team === enemyTeam) {
+            hasEnemy = true; break;
+          }
+        }
+      }
+
+      if (!hasEnemy) {
+        endGame(team, `У соперника больше не осталось фигур!`);
+        return true;
+      }
+      return false;
+    }
+
+    function startGame() {
+      gameStarted = true;
+      document.getElementById('btnStartGame').style.display = 'none';
+      document.getElementById('selectTimeMode').disabled = true;
+      if (timeMode === 'timed') {
+        startTimer();
+      }
+      updateUI();
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (timers[currentTurn] > 0) {
+          timers[currentTurn]--;
+          updateTimerText();
+        } else {
+          const winner = currentTurn === 'blue' ? 'red' : 'blue';
+          endGame(winner, `Время соперника истекло!`);
+        }
+      }, 1000);
+    }
+
+    function updateTimerText() {
+      if (timeMode === 'infinite') {
+        document.getElementById('timerBlue').textContent = '∞';
+        document.getElementById('timerRed').textContent = '∞';
+        return;
+      }
+      const fmt = s => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+      document.getElementById('timerBlue').textContent = fmt(timers.blue);
+      document.getElementById('timerRed').textContent = fmt(timers.red);
+    }
+
+    function updateUI() {
+      const status = document.getElementById('turnStatus');
+      if (!gameStarted) {
+        status.textContent = 'Ожидание старта...';
+      } else {
+        status.textContent = `Ход: ${currentTurn === 'blue' ? 'СИНИЕ' : 'КРАСНЫЕ'}`;
+      }
+
+      const badge = document.getElementById('myTeamBadge');
+      if (myTeam === 'blue') {
+        badge.className = 'my-team-badge blue';
+        badge.innerHTML = 'Вы играете за: <span>СИНИХ 🔵</span>';
+      } else {
+        badge.className = 'my-team-badge red';
+        badge.innerHTML = 'Вы играете за: <span>КРАСНЫХ 🔴</span>';
+      }
+
+      document.getElementById('timerBlueCard').classList.toggle('active', gameStarted && currentTurn === 'blue');
+      document.getElementById('timerRedCard').classList.toggle('active', gameStarted && currentTurn === 'red');
+
+      document.getElementById('scoreMy').textContent = scoreMy;
+      document.getElementById('scoreOpponent').textContent = scoreOpponent;
+
+      updateTimerText();
+    }
+
+    function endGame(winner, msg) {
+      clearInterval(timerInterval);
+      gameStarted = false;
+
+      let isDraw = (winner === 'draw');
+      let isMyWin = (winner === myTeam);
+
+      if (isDraw) {
+        scoreMy += 0.5;
+        scoreOpponent += 0.5;
+        document.getElementById('gameOverTitle').textContent = 'НИЧЬЯ!';
+      } else if (isMyWin || !isOnline) {
+        scoreMy += 1;
+        document.getElementById('gameOverTitle').textContent = 'ПОБЕДА!';
+      } else {
+        scoreOpponent += 1;
+        document.getElementById('gameOverTitle').textContent = 'ПОРАЖЕНИЕ';
+      }
+
+      document.getElementById('gameOverMsg').textContent = msg;
+      document.getElementById('gameOverModal').classList.add('active');
+      updateUI();
+    }
+
+    document.getElementById('selectTimeMode').addEventListener('change', (e) => {
+      timeMode = e.target.value;
+      updateTimerText();
+      if (isOnline && conn && conn.open) {
+        conn.send({ type: 'CHANGE_TIME_MODE', mode: timeMode });
+      }
+    });
+
+    document.getElementById('selectTheme').addEventListener('change', (e) => {
+      if (e.target.value === 'summer') {
+        document.body.classList.add('theme-summer');
+      } else {
+        document.body.classList.remove('theme-summer');
+      }
+    });
+
+    document.getElementById('selectSkins').addEventListener('change', (e) => {
+      activeSkinSet = e.target.value;
+      renderBoard();
+    });
+
+    document.body.classList.add('theme-summer');
+
+    document.getElementById('btnStartGame').addEventListener('click', () => {
+      startGame();
+      if (isOnline && conn && conn.open) conn.send({ type: 'START_GAME' });
+    });
+
+    document.getElementById('btnSwapTeam').addEventListener('click', () => {
+      myTeam = myTeam === 'blue' ? 'red' : 'blue';
+      updateUI();
+      if (isOnline && conn && conn.open) conn.send({ type: 'SWAP', team: myTeam });
+    });
+
+    document.getElementById('btnOfferDraw').addEventListener('click', () => {
+      if (!gameStarted) return alert('Игра ещё не началась!');
+      if (!isOnline) {
+        if (confirm('Завершить локальную игру вничью?')) {
+          endGame('draw', 'Ничья по соглашению сторон');
+        }
+        return;
+      }
+      if (conn && conn.open) {
+        conn.send({ type: 'OFFER_DRAW' });
+        alert('Предложение ничьей отправлено сопернику');
+      }
+    });
+
+    document.getElementById('btnAcceptDraw').addEventListener('click', () => {
+      document.getElementById('drawRequestModal').classList.remove('active');
+      if (conn && conn.open) conn.send({ type: 'ACCEPT_DRAW' });
+      endGame('draw', 'Ничья по соглашению сторон');
+    });
+
+    document.getElementById('btnDeclineDraw').addEventListener('click', () => {
+      document.getElementById('drawRequestModal').classList.remove('active');
+      if (conn && conn.open) conn.send({ type: 'DECLINE_DRAW' });
+    });
+
+    document.getElementById('btnSurrender').addEventListener('click', () => {
+      if (!gameStarted) return alert('Игра ещё не началась!');
+      document.getElementById('surrenderModal').classList.add('active');
+    });
+
+    document.getElementById('btnCancelSurrender').addEventListener('click', () => {
+      document.getElementById('surrenderModal').classList.remove('active');
+    });
+
+    document.getElementById('btnConfirmSurrender').addEventListener('click', () => {
+      document.getElementById('surrenderModal').classList.remove('active');
+      const winner = myTeam === 'blue' ? 'red' : 'blue';
+      if (isOnline && conn && conn.open) conn.send({ type: 'SURRENDER' });
+      endGame(winner, 'Вы сдались');
+    });
+
+    document.getElementById('btnRestart').addEventListener('click', () => {
+      document.getElementById('gameOverModal').classList.remove('active');
+      initGame();
+    });
+
+    /* PeerJS */
+    document.getElementById('btnHost').addEventListener('click', () => {
+      document.getElementById('netStatus').textContent = '● Создание...';
+      peer = new Peer();
+
+      peer.on('open', id => {
+        document.getElementById('hostCodeRow').style.display = 'flex';
+        document.getElementById('myCodeInput').value = id;
+        document.getElementById('netStatus').textContent = '● Ожидание...';
+      });
+
+      peer.on('connection', c => {
+        conn = c;
+        setupConn();
+        isOnline = true;
+        myTeam = 'blue';
+        scoreMy = 0;
+        scoreOpponent = 0;
+        updateUI();
+      });
+    });
+
+    document.getElementById('btnJoin').addEventListener('click', () => {
+      const code = document.getElementById('joinCodeInput').value.trim();
+      if (!code) return alert('Введите код!');
+      
+      document.getElementById('netStatus').textContent = '● Подключение...';
+      peer = new Peer();
+
+      peer.on('open', () => {
+        conn = peer.connect(code);
+        setupConn();
+        isOnline = true;
+        myTeam = 'red';
+        scoreMy = 0;
+        scoreOpponent = 0;
+        updateUI();
+      });
+    });
+
+    function setupConn() {
+      conn.on('open', () => {
+        document.getElementById('netStatus').textContent = '● В сети';
+        initGame();
+        conn.send({ type: 'CHANGE_TIME_MODE', mode: timeMode });
+      });
+
+      conn.on('data', data => {
+        if (!data || !data.type) return;
+        if (data.type === 'START_GAME') startGame();
+        else if (data.type === 'MOVE') makeMove(data.from, data.to);
+        else if (data.type === 'SURRENDER') endGame(myTeam, 'Соперник сдался!');
+        else if (data.type === 'OFFER_DRAW') {
+          document.getElementById('drawRequestModal').classList.add('active');
+        }
+        else if (data.type === 'ACCEPT_DRAW') {
+          endGame('draw', 'Соперник согласился на ничью!');
+        }
+        else if (data.type === 'DECLINE_DRAW') {
+          alert('Соперник отклонил предложение ничьей.');
+        }
+        else if (data.type === 'SWAP') {
+          myTeam = data.team === 'blue' ? 'red' : 'blue';
+          updateUI();
+        } else if (data.type === 'CHANGE_TIME_MODE') {
+          timeMode = data.mode;
+          document.getElementById('selectTimeMode').value = timeMode;
+          updateTimerText();
+        }
+      });
+    }
+
+    document.getElementById('btnCopyCode').addEventListener('click', () => {
+      const code = document.getElementById('myCodeInput').value;
+      if (code) {
+        navigator.clipboard.writeText(code);
+        alert('Код скопирован!');
+      }
+    });
+
+    initGame();
+  </script>
+</body>
+</html>
